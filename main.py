@@ -194,17 +194,21 @@ def main():
         if not os.path.exists(args.start_config_file):
             print(f"Error: Start config file '{args.start_config_file}' not found.", file=sys.stderr)
             exit(1)
+        # Expand the file with --dump-config: only the options present in the base configuration
+        # are optimized, and a .clang-format usually lists a few options on top of BasedOnStyle.
+        # The dump has every option of this clang-format version with the file's values.
+        dump_cmd = [clang_format_path, f"--style=file:{os.path.abspath(args.start_config_file)}", "--dump-config"]
         try:
-            with open(args.start_config_file, 'r') as f:
-                start_config_content = f.read()
+            start_config_content = run_command(dump_cmd, check=True, capture_output=True, text=True, debug=DEBUG).stdout
+        except subprocess.CalledProcessError as e:
+            print(f"Error: clang-format cannot read start config file '{args.start_config_file}': {e.stderr.strip()}", file=sys.stderr)
+            exit(1)
+        try:
             options_info = parse_clang_format_options(start_config_content)
             if not options_info:
                 print(f"Error: Failed to parse YAML from '{args.start_config_file}'. Please ensure it's a valid .clang-format file.", file=sys.stderr)
                 exit(1)
-            print(f"Successfully loaded and parsed initial configuration from '{args.start_config_file}'.", file=sys.stderr)
-        except IOError as e:
-            print(f"Error reading start config file '{args.start_config_file}': {e}", file=sys.stderr)
-            exit(1)
+            print(f"Successfully loaded and parsed initial configuration from '{args.start_config_file}' ({len(options_info)} options after --dump-config).", file=sys.stderr)
         except yaml.YAMLError as e:
             print(f"Error parsing YAML from '{args.start_config_file}': {e}", file=sys.stderr)
             exit(1)
