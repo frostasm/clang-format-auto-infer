@@ -55,6 +55,8 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
         # Find files to format (common C/C++ extensions)
         # Use git ls-files to only format tracked files
         git_ls_files_cmd = ["git", "ls-files", "--", "*.c", "*.cc", "*.cpp", "*.cxx", "*.h", "*.hh", "*.hpp", "*.hxx", "*.m", "*.mm"]
+        # Excluded paths (e.g. third-party code) as negative pathspecs
+        git_ls_files_cmd += [f":(exclude){pathspec}" for pathspec in formatter_settings.exclude_pathspecs]
         try:
             result = run_command(git_ls_files_cmd, capture_output=True, text=True, check=True, debug=debug, timeout=GIT_COMMAND_TIMEOUT) # cwd is already repo_path
             files_to_format = result.stdout.splitlines()

@@ -139,6 +139,14 @@ def main():
         default=100.0,
         help="Percentage of files to randomly sample for fitness calculation (0.0-100.0). Use a lower value for faster but less accurate optimization."
     )
+    parser.add_argument(
+        "--exclude",
+        dest="exclude_pathspecs",
+        action="append",
+        default=[],
+        metavar="PATHSPEC",
+        help="Git pathspec of files that are not formatted and not counted, e.g. 'thirdparty' or '*.pb.h'. Can be given several times."
+    )
 
     args = parser.parse_args()
 
@@ -262,7 +270,8 @@ def main():
         optimized_options_info = None
         formatter_settings = FormatterSettings(
             file_sample_percentage=args.file_sample_percentage,
-            random_seed=RANDOM_SEED # The fixed random seed
+            random_seed=RANDOM_SEED, # The fixed random seed
+            exclude_pathspecs=args.exclude_pathspecs
         )
 
         if args.optimizer == "genetic":

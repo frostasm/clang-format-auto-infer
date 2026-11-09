@@ -1,5 +1,5 @@
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 @dataclass
@@ -38,6 +38,8 @@ class FormatterSettings:
     """
     file_sample_percentage: float # Percentage of files to sample for fitness calculation
     random_seed: int # Seed for random file sampling
+    # Git pathspecs of files that are never formatted (e.g. "thirdparty", "*.pb.h")
+    exclude_pathspecs: List[str] = field(default_factory=list)
 
 @dataclass
 class GeneticAlgorithmLookups:
