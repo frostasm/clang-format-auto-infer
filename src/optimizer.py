@@ -82,8 +82,8 @@ def optimize_option_with_values(flat_options_info: Dict[str, Any], full_option_p
         flat_options_info[full_option_path]['value'] = value_to_test
         config_string = generate_clang_format_config(flat_options_info) # Pass the flat dict
 
-        # run_clang_format_and_count_changes will now exit on critical clang-format error,
-        # return float('inf') on invalid config error, or return >= 0 on success, or -1 on git error.
+        # run_clang_format_and_count_changes returns float('inf') when clang-format rejects the
+        # config, crashes or times out, >= 0 on success, or -1 on git error.
         changes = run_clang_format_and_count_changes(
             config_string,
             repo_path=worker_context.repo_path,

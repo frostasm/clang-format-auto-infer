@@ -2,7 +2,6 @@ import os
 import subprocess
 import sys
 import re
-import shutil
 import random # New import for file sampling
 from .utils import run_command # Import run_command from utils
 # Removed IslandEvolutionArgs import as it's no longer directly used here
@@ -26,17 +25,21 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
 
     Returns:
         int or float('inf'): The total number of lines added or deleted by clang-format (>= 0).
-                             Returns float('inf') if clang-format reports an invalid configuration
-                             (e.g., "cannot be used with") or if it times out.
+                             Returns float('inf') if clang-format rejects the configuration
+                             (e.g., "cannot be used with", "Missing QualifierOrder"), crashes
+                             or times out.
                              Returns -1 if a non-clang-format error occurs (like git diff or file listing).
-                             Exits the script if a different type of clang-format execution error occurs.
+
+    Raises:
+        RuntimeError: If the clang-format executable cannot be found. The function runs in
+                      worker processes, so it never calls sys.exit(): a SystemExit in a
+                      multiprocessing.Pool worker leaves the pool waiting forever.
     """
     original_cwd = os.getcwd()
     # Ensure we are in the repo directory for git commands
     # os.chdir(repo_path) # Moved chdir into the try block for better cleanup
 
     temp_config_file = os.path.join(repo_path, ".clang-format.tmp") # Use a temp file inside the repo
-    error_config_dest = "/tmp/clang-format.yml" # Destination for error config file
 
     try:
         # Change to repo directory
@@ -86,10 +89,9 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
         try:
             # check=True to catch clang-format errors
             run_command(clang_format_cmd, check=True, capture_output=True, text=True, debug=debug, timeout=CLANG_FORMAT_TIMEOUT) # cwd is already repo_path
-        except FileNotFoundError:
-            print(f"Worker {process_id}: Error: clang-format command not found. Please ensure it is installed and in your PATH.", file=sys.stderr)
-            # Cannot copy config if clang-format isn't found to even try running it
-            sys.exit(1) # Exit immediately as requested
+        except FileNotFoundError as e:
+            # Raise instead of sys.exit(): the caller's pool reports the exception to the main process
+            raise RuntimeError(f"Worker {process_id}: clang-format command not found. Please ensure it is installed and in your PATH.") from e
         except subprocess.TimeoutExpired as e:
             print(f"Worker {process_id}: Warning: clang-format command timed out. Treating as high cost.", file=sys.stderr)
             if debug:
@@ -120,23 +122,20 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
                     if e.stderr: print(f"Worker {process_id}: Stderr:\n{e.stderr}", file=sys.stderr)
                 return float('inf') # Return infinity to signify a very bad configuration
             else:
-                # Other clang-format errors are critical, exit
-                print(f"Worker {process_id}: Error running clang-format with the current configuration:", file=sys.stderr)
-                print(f"Worker {process_id}: Command: {' '.join(e.cmd)}", file=sys.stderr)
-                print(f"Worker {process_id}: Exit code: {e.returncode}", file=sys.stderr)
-                if e.stdout:
-                     print(f"Worker {process_id}: Stdout:\n{e.stdout}", file=sys.stderr)
-                if e.stderr:
-                     print(f"Worker {process_id}: Stderr:\n{e.stderr}", file=sys.stderr)
-
-                # Copy the problematic config file before exiting
-                try:
-                    shutil.copyfile(temp_config_file, error_config_dest)
-                    print(f"Worker {process_id}: Configuration causing the error copied to {error_config_dest} for inspection.", file=sys.stderr)
-                except IOError as copy_error:
-                    print(f"Worker {process_id}: Error copying temporary config file to {error_config_dest}: {copy_error}", file=sys.stderr)
-
-                sys.exit(1) # Exit immediately as requested
+                # Any other error means that clang-format rejected the configuration, e.g.
+                # "Missing QualifierOrder" for QualifierAlignment: Custom, or a value that this
+                # clang-format version does not know. Treat it as high cost, like the cases above:
+                # exiting here would kill a pool worker and hang the optimization.
+                stderr_lines = (e.stderr or "").strip().splitlines()
+                reason = stderr_lines[-1] if stderr_lines else f"exit code {e.returncode}"
+                print(f"Worker {process_id}: Warning: clang-format rejected the configuration ({reason}). Treating as high cost.", file=sys.stderr)
+                if debug:
+                    print(f"Worker {process_id}: Command: {' '.join(e.cmd)}", file=sys.stderr)
+                    print(f"Worker {process_id}: Exit code: {e.returncode}", file=sys.stderr)
+                    if e.stdout: print(f"Worker {process_id}: Stdout:\n{e.stdout}", file=sys.stderr)
+                    if e.stderr: print(f"Worker {process_id}: Stderr:\n{e.stderr}", file=sys.stderr)
+                    print(f"Worker {process_id}: Configuration:\n{config_string}", file=sys.stderr)
+                return float('inf')
 
         # Count changes using git diff --shortstat from the repo directory
         git_diff_cmd = ["git", "diff", "--shortstat"]
@@ -175,9 +174,6 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
 
     finally:
         # Ensure we are in the repo directory before resetting
-        # This block runs even if sys.exit() is called, but cleanup might be incomplete
-        # depending on the exact point of failure and OS.
-        # The copy happens *before* exit, so that part is guaranteed.
         if os.getcwd() != repo_path:
              # This shouldn't happen if chdir inside try works, but as a safeguard
              try:
@@ -198,8 +194,6 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
             # If git diff failed, this should still run.
 
         # Clean up the temporary config file
-        # This file is copied *before* exit on clang-format error, so removing it here is fine.
-        # It's also removed if clang-format succeeds or returns float('inf').
         if os.path.exists(temp_config_file):
             try:
                 os.remove(temp_config_file)
