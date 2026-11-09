@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Tuple
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.error import YAMLError
 
 _PLAIN_SCALAR = re.compile(r'^[A-Za-z_][A-Za-z0-9_.+-]*$')
 _RESERVED_WORDS = {'true', 'false', 'null', '~', 'yes', 'no', 'on', 'off'}
@@ -91,7 +92,12 @@ def update_config_text(text: str, changes: Dict[str, Tuple[Any, Any]], result_op
     """
     if not changes:
         return text, []
-    data = YAML().load(text)
+    try:
+        data = YAML().load(text)
+    except YAMLError as e:
+        # E.g. per-language sections separated by "---": the update supports one document only
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        return text, [f"the start config cannot be read as one YAML document ({reason})"]
     if not isinstance(data, CommentedMap):
         return text, ["the start config is not a YAML mapping"]
 
