@@ -12,7 +12,36 @@ from .data_classes import FormatterSettings
 CLANG_FORMAT_TIMEOUT = 120 # seconds
 GIT_COMMAND_TIMEOUT = 60 # seconds
 
+# Shared statistics of the run for its progress display: multiprocessing.Value objects created
+# by the optimizer and set in each worker (and the main process) by set_evaluation_stats().
+_evaluation_count = None # Value('i'): number of finished evaluations
+_best_fitness = None # Value('d'): lowest number of changes seen so far
+
+def set_evaluation_stats(evaluation_count, best_fitness):
+    """
+    Makes run_clang_format_and_count_changes() count its evaluations and keep the best fitness
+    in the given shared values. Used as a multiprocessing.Pool initializer.
+    """
+    global _evaluation_count, _best_fitness
+    _evaluation_count = evaluation_count
+    _best_fitness = best_fitness
+
 def run_clang_format_and_count_changes(config_string: str, repo_path: str, process_id: int, debug: bool, formatter_settings: FormatterSettings) -> float:
+    """
+    Evaluates a configuration with _run_clang_format_and_count_changes() and records the
+    evaluation in the shared statistics, when set_evaluation_stats() was called.
+    """
+    changes = _run_clang_format_and_count_changes(config_string, repo_path, process_id, debug, formatter_settings)
+    if _evaluation_count is not None:
+        with _evaluation_count.get_lock():
+            _evaluation_count.value += 1
+    if _best_fitness is not None and changes >= 0:
+        with _best_fitness.get_lock():
+            if changes < _best_fitness.value:
+                _best_fitness.value = changes
+    return changes
+
+def _run_clang_format_and_count_changes(config_string: str, repo_path: str, process_id: int, debug: bool, formatter_settings: FormatterSettings) -> float:
     """
     Runs a clang-format configuration on a repository, counts changes, and resets.
 

@@ -10,6 +10,7 @@ from .base_optimizer import BaseOptimizer
 from .data_classes import NevergradConfig, GeneticAlgorithmLookups, WorkerContext, FormatterSettings
 from .clang_format_parser import generate_clang_format_config
 from .config_loader import with_current_value
+from .progress import RunProgress
 from .repo_formatter import run_clang_format_and_count_changes
 
 # Initialize plt to None to prevent UnboundLocalError warnings from static analyzers
@@ -222,6 +223,8 @@ class NevergradOptimizer(BaseOptimizer):
         executor = None # Initialize executor to None
         pending_futures: Dict[concurrent.futures.Future, ng.p.Parameter] = {}
         current_eval_count = 0
+        finished_eval_count = 0
+        progress = RunProgress("Evaluations", budget, formatter_settings.verbose).start()
 
         try:
             # Use functools.partial to bind the static context arguments to the objective function
@@ -269,11 +272,15 @@ class NevergradOptimizer(BaseOptimizer):
 
                 for completed_future in done:
                     candidate = pending_futures.pop(completed_future) # Remove from pending
+                    finished_eval_count += 1
                     try:
                         loss = completed_future.result()
                         optimizer.tell(candidate, loss)
                         best_loss_so_far = loss if not best_fitness_history else min(loss, min(best_fitness_history))
+                        if not best_fitness_history or best_loss_so_far < best_fitness_history[-1]:
+                            print(f"Nevergrad: evaluation {finished_eval_count}/{budget}: new best fitness: {best_loss_so_far}", file=sys.stderr)
                         best_fitness_history.append(best_loss_so_far)
+                        progress.update(finished_eval_count, finished_eval_count, best_loss_so_far)
 
                         if debug:
                             print(f"Nevergrad: Evaluation {len(best_fitness_history)} (Loss: {loss}, Best so far: {best_loss_so_far})", file=sys.stderr)
@@ -298,6 +305,7 @@ class NevergradOptimizer(BaseOptimizer):
                         print(f"Nevergrad: Error during evaluation: {e}", file=sys.stderr)
                         # Tell Nevergrad about the error with a high loss to penalize it
                         optimizer.tell(candidate, float('inf'))
+                        progress.update(finished_eval_count, finished_eval_count, best_fitness_history[-1] if best_fitness_history else None)
                         # Continue to the next completed future, don't break the outer loop
 
                 if interrupted:
@@ -318,6 +326,7 @@ class NevergradOptimizer(BaseOptimizer):
                 return base_options_info
             print("Attempting to process the best recommendation found so far.", file=sys.stderr)
         finally:
+            progress.stop()
             if executor:
                 print("Shutting down Nevergrad's ProcessPoolExecutor...", file=sys.stderr)
                 # Cancel remaining futures before shutdown

@@ -5,7 +5,8 @@ import multiprocessing
 from typing import List, Tuple, Dict, Any
 
 # Import formatter and config generator
-from .repo_formatter import run_clang_format_and_count_changes
+from .repo_formatter import run_clang_format_and_count_changes, set_evaluation_stats
+from .progress import RunProgress
 from .clang_format_parser import generate_clang_format_config
 from .config_loader import with_current_value
 from .data_classes import GeneticOptimizationConfig, GeneticAlgorithmLookups, IslandEvolutionArgs, WorkerContext, FormatterSettings
@@ -449,6 +450,11 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
             process_id=0 # Main process can be considered worker 0 for this initial calculation
         )
 
+        # Shared statistics for the progress display, counted by the main process and the workers
+        evaluation_count = multiprocessing.Value('i', 0)
+        best_fitness_seen = multiprocessing.Value('d', float('inf'))
+        set_evaluation_stats(evaluation_count, best_fitness_seen)
+
         base_fitness = run_clang_format_and_count_changes(
             generate_clang_format_config(base_individual_config),
             repo_path=initial_worker_context.repo_path,
@@ -511,13 +517,18 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
         # Create the multiprocessing pool
         # The number of processes in the pool is limited by the number of available repo copies
         num_processes = len(repo_paths)
-        pool = multiprocessing.Pool(processes=num_processes)
+        pool = multiprocessing.Pool(processes=num_processes, initializer=set_evaluation_stats, initargs=(evaluation_count, best_fitness_seen))
 
         interrupted = False # Flag to indicate if optimization was interrupted by Ctrl-C
 
+        verbose = formatter_settings.verbose
+        progress = RunProgress("Generations", num_iterations, verbose).start()
+
+        def update_progress(completed_iterations):
+            progress.update(completed_iterations, evaluation_count.value, best_fitness_seen.value)
+
         try:
             # Evolution Loop
-            verbose = formatter_settings.verbose
             for iteration in range(num_iterations):
                 if verbose:
                     print(f"\n--- Iteration {iteration + 1}/{num_iterations} ---", file=sys.stderr)
@@ -537,8 +548,14 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                     # The wrapper will handle assigning the correct repo_path and process_id
                     tasks_args.append((island_args_for_this_island, repo_paths, lookups, debug, formatter_settings))
 
-                # Run island evolutions in parallel
-                results = pool.map(_island_evolution_task_wrapper, tasks_args)
+                # Run island evolutions in parallel; poll the shared statistics meanwhile, so that
+                # the progress display moves within a generation
+                async_results = pool.map_async(_island_evolution_task_wrapper, tasks_args)
+                while not async_results.ready():
+                    async_results.wait(0.5)
+                    update_progress(iteration)
+                results = async_results.get()
+                update_progress(iteration + 1)
 
                 # Process results from parallel evolution
                 for i, (new_island_pop, best_in_island_for_this_gen) in enumerate(results):
@@ -597,6 +614,7 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                     print(f"Warning: Could not close matplotlib plots: {e}", file=sys.stderr)
 
         finally:
+            progress.stop()
             if interrupted:
                 print("Forcing termination of worker pool...", file=sys.stderr)
                 pool.terminate() # Terminate workers immediately

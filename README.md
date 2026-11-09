@@ -9,6 +9,7 @@ formatting churn and improving code consistency.
 *   **Forced Options** 🔒: Allows users to specify certain `clang-format` options that should always be set to a particular value, overriding the optimization process for those specific options. See `data/forced.yml` as an example of the options you would typically configure by hand.
 *   **Change Minimization** 📊: The fitness function for the genetic algorithm is based on minimizing the `git diff --shortstat` output (total insertions and
 deletions) after applying `clang-format`.
+*   **Progress Display** ⏳: On a terminal, a progress bar shows the generations (genetic algorithm) or evaluations (Nevergrad) done, the number and rate of evaluations, the best fitness, the elapsed and the estimated remaining time; new best results are printed above it. When the output is not a terminal, or with `--verbose`, a `[status]` line with the same information is printed every 30 seconds and at the end.
 *   **Interactive Plotting** 📈: Optionally visualizes the best fitness score over time for each island using `matplotlib` (use `--plot-fitness` to enable).
 *   **Parallelization** ⚡: Utilize multiple CPU cores by creating temporary clones of the repository (`git clone`) and running fitness calculations in parallel. The clones contain the committed state of the checked-out branch: commit the changes you want analysed.
 *   **File Sampling** ✂️: Speed up optimization by randomly sampling a percentage of files from the repository for fitness evaluation.
@@ -39,12 +40,13 @@ It's recommended to use a virtual environment.
     ```
 2.  **Install the required Python packages:**
     ```bash
-    pip install PyYAML requests beautifulsoup4 lxml matplotlib nevergrad
+    pip install PyYAML requests beautifulsoup4 lxml matplotlib nevergrad rich
     ```
     *   `PyYAML`: For parsing and generating YAML configurations.
     *   `requests`, `beautifulsoup4`, `lxml`: For scraping `clang-format` documentation to get option values.
     *   `matplotlib`: (Optional) For plotting the fitness history during optimization. If not installed, plotting will be disabled.
     *   `nevergrad`: For black-box optimization algorithms.
+    *   `rich`: For the progress bar.
 ## Usage ⚙️
 The optimization process involves two main steps: first, generating a JSON file with `clang-format` option values (if the one provided in the repo is not sufficient/outdated), and then running the main optimizer.
 ### Step 1: (Optional) Generate Clang-Format Option Values 📝

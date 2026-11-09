@@ -4,6 +4,7 @@
 #     "PyYAML",
 #     "nevergrad",
 #     "matplotlib",
+#     "rich",
 # ]
 # ///
 import os
