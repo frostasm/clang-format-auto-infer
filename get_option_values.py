@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "requests",
+#     "beautifulsoup4",
+#     "lxml",
+# ]
+# ///
 from bs4 import BeautifulSoup # pyright: ignore
 import argparse
 import requests

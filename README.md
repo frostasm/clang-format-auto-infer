@@ -21,6 +21,16 @@ Before you begin, ensure you have the following installed and available in your 
 `sudo apt install clang-format` on Ubuntu, `brew install llvm` on macOS).
 *   **Git**: The version control system, used for repository operations and diffing.
 ### Python Dependencies 📦
+#### With uv (recommended)
+`main.py`, `get_option_values.py` and `test.py` declare their dependencies as [PEP 723](https://peps.python.org/pep-0723/) inline script metadata. [uv](https://docs.astral.sh/uv/) installs them into a cached environment on the first run, so no installation step is needed:
+
+```bash
+uv run main.py <repo_path> [OPTIONS]
+uv run get_option_values.py --llvm-version 20 > clang-format-20-values.json
+```
+
+The commands below show `python3 <script>`; with uv, write `uv run <script>` instead.
+#### With pip
 It's recommended to use a virtual environment.
 1.  **Create a virtual environment (optional but recommended):**
     ```bash

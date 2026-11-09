@@ -1,3 +1,11 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "PyYAML",
+#     "nevergrad",
+#     "matplotlib",
+# ]
+# ///
 import os
 import sys
 import tempfile
