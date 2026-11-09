@@ -147,6 +147,13 @@ def main():
         metavar="PATHSPEC",
         help="Git pathspec of files that are not formatted and not counted, e.g. 'thirdparty' or '*.pb.h'. Can be given several times."
     )
+    parser.add_argument(
+        "--clang-format",
+        dest="clang_format",
+        default="clang-format",
+        metavar="EXECUTABLE",
+        help="clang-format executable to optimize the configuration for: a name in PATH or a path, e.g. clang-format-20. Default: clang-format."
+    )
 
     args = parser.parse_args()
 
@@ -167,6 +174,19 @@ def main():
 
 
     print(f"Analyzing repository: {repo_path_abs}", file=sys.stderr)
+
+    # Check clang-format here, once: a worker that cannot run it would only report an error per
+    # evaluation, after the repository clones were made.
+    clang_format_path = shutil.which(args.clang_format)
+    if not clang_format_path:
+        print(f"Error: clang-format executable '{args.clang_format}' not found.", file=sys.stderr)
+        exit(1)
+    try:
+        version = run_command([clang_format_path, "--version"], check=True, capture_output=True, text=True, debug=DEBUG).stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print(f"Error: '{clang_format_path} --version' failed: {e.stderr.strip()}", file=sys.stderr)
+        exit(1)
+    print(f"Using {clang_format_path}: {version}", file=sys.stderr)
 
     options_info = None
     if args.start_config_file:
@@ -191,7 +211,7 @@ def main():
     else:
         # Get initial clang-format options structure from dump-config
         print("\nGetting initial configuration from 'clang-format --dump-config'...", file=sys.stderr)
-        options_output = get_clang_format_options(debug=DEBUG)
+        options_output = get_clang_format_options(debug=DEBUG, clang_format=clang_format_path)
 
         if not options_output:
             print("\nFailed to retrieve clang-format options from --dump-config.", file=sys.stderr)
@@ -279,7 +299,8 @@ def main():
         formatter_settings = FormatterSettings(
             file_sample_percentage=args.file_sample_percentage,
             random_seed=RANDOM_SEED, # The fixed random seed
-            exclude_pathspecs=args.exclude_pathspecs
+            exclude_pathspecs=args.exclude_pathspecs,
+            clang_format=clang_format_path
         )
 
         if args.optimizer == "genetic":

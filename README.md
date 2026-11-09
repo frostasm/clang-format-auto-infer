@@ -79,6 +79,7 @@ python3 main.py <repo_path> [OPTIONS]
 *   `-j`, `--jobs <int>`: Number of parallel jobs to run for fitness calculation (default: `1`). Each job will operate on a separate temporary clone of your repository. Increase this to utilize more CPU cores. For the `nevergrad` optimizer, this argument directly controls Nevergrad's `num_workers` parameter, enabling it to utilize multiple CPU cores by distributing evaluations across separate temporary repository copies.
 *   `--start-config-file <file_path>`: Path to an existing `.clang-format` file to use as the initial configuration for optimization. If this option is not provided, the tool will start with the default configuration obtained from `clang-format --dump-config`.
 *   `--file-sample-percentage <float>`: Percentage of files (0.0-100.0) to randomly sample from the repository for fitness calculation (default: `100.0`). Lower values speed up the process but may reduce accuracy.
+*   `--clang-format <executable>`: The `clang-format` to optimize the configuration for, as a name in `PATH` or a path, e.g. `clang-format-20` (default: `clang-format`). Option values and their layout change between `clang-format` versions, so use the version your project formats with, and an option values JSON for the same version.
 *   `--exclude <pathspec>`: Git pathspec of files that are neither formatted nor counted, e.g. `thirdparty` or `'*.pb.h'`. Can be given several times. Use it for third-party and generated code, which does not follow the project's style.
 
 ### Example Usage (Genetic Algorithm)

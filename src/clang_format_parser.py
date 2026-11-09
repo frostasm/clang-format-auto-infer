@@ -4,18 +4,19 @@ import subprocess
 import copy
 from .utils import run_command # Import run_command from utils
 
-def get_clang_format_options(debug=False):
+def get_clang_format_options(debug=False, clang_format="clang-format"):
     """
     Runs 'clang-format --dump-config' to get a list of all possible options.
 
     Args:
         debug (bool): Enable debug output for run_command.
+        clang_format (str): The clang-format executable: a name in PATH or a path.
 
     Returns:
         str: The output from 'clang-format --dump-config'.
         None: If clang-format is not found or an error occurs.
     """
-    cmd = ["clang-format", "--dump-config"]
+    cmd = [clang_format, "--dump-config"]
     try:
         result = run_command(
             cmd,

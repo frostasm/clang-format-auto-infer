@@ -40,6 +40,7 @@ class FormatterSettings:
     random_seed: int # Seed for random file sampling
     # Git pathspecs of files that are never formatted (e.g. "thirdparty", "*.pb.h")
     exclude_pathspecs: List[str] = field(default_factory=list)
+    clang_format: str = "clang-format" # clang-format executable: a name in PATH or a path
 
 @dataclass
 class GeneticAlgorithmLookups:
