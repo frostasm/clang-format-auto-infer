@@ -9,6 +9,7 @@ import concurrent.futures
 from .base_optimizer import BaseOptimizer
 from .data_classes import NevergradConfig, GeneticAlgorithmLookups, WorkerContext, FormatterSettings
 from .clang_format_parser import generate_clang_format_config
+from .config_loader import with_current_value
 from .repo_formatter import run_clang_format_and_count_changes
 
 # Initialize plt to None to prevent UnboundLocalError warnings from static analyzers
@@ -150,6 +151,8 @@ class NevergradOptimizer(BaseOptimizer):
             possible_values = None
             if full_option_path in lookups.json_options_lookup:
                 possible_values = lookups.json_options_lookup[full_option_path]['possible_values']
+                if possible_values:
+                    possible_values = with_current_value(possible_values, option_info['value'])
 
             if option_info['type'] == 'bool':
                 # For booleans, use a Scalar that is cast to int (0 or 1)

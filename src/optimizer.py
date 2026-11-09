@@ -7,6 +7,7 @@ from typing import List, Tuple, Dict, Any
 # Import formatter and config generator
 from .repo_formatter import run_clang_format_and_count_changes
 from .clang_format_parser import generate_clang_format_config
+from .config_loader import with_current_value
 from .data_classes import GeneticOptimizationConfig, GeneticAlgorithmLookups, IslandEvolutionArgs, WorkerContext, FormatterSettings
 from .base_optimizer import BaseOptimizer # New import
 
@@ -186,7 +187,10 @@ def mutate(individual_config: Dict[str, Any], island_args: IslandEvolutionArgs, 
 
     possible_values = []
     if option_to_mutate_path in island_args.lookups.json_options_lookup and island_args.lookups.json_options_lookup[option_to_mutate_path]['possible_values']:
-        possible_values = island_args.lookups.json_options_lookup[option_to_mutate_path]['possible_values']
+        possible_values = with_current_value(
+            island_args.lookups.json_options_lookup[option_to_mutate_path]['possible_values'],
+            option_info['value']
+        )
     elif option_info['type'] == 'bool':
         possible_values = [True, False]
 

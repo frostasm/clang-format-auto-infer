@@ -3,6 +3,30 @@ import yaml
 import os
 import sys
 
+def with_current_value(possible_values, current_value):
+    """
+    Returns the values to test for an option, with its current value added when the list
+    does not have it.
+
+    The lists of the option values JSON are generic (e.g. AccessModifierOffset: -4, -2, 0, ...),
+    so the value of the base configuration (e.g. -3) can be missing; testing only the listed
+    values could then never keep it, and every mutation of the option would make the
+    configuration worse.
+
+    Args:
+        possible_values (list): Values from the JSON file (strings) or [True, False].
+        current_value: The option's value in the configuration being mutated.
+
+    Returns:
+        list: possible_values, plus current_value at the end when it is missing.
+    """
+    if current_value is None or isinstance(current_value, (list, dict)):
+        return list(possible_values)
+    listed = {str(value).lower() for value in possible_values}
+    if str(current_value).lower() in listed:
+        return list(possible_values)
+    return list(possible_values) + [current_value]
+
 def load_json_option_values(file_path):
     """
     Loads clang-format option values and possible values from a JSON file.
