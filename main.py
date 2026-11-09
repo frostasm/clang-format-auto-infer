@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile # New import for temporary directories
 import shutil # New import for copying/removing directories
+import subprocess
 import yaml # New import for loading YAML config files
 import multiprocessing # New import for multiprocessing Manager and Value
 
@@ -12,6 +13,7 @@ from src.config_loader import load_json_option_values, load_forced_options
 from src.optimizer import GeneticAlgorithmOptimizer # Import the GA optimizer class
 from src.nevergrad_optimizer import NevergradOptimizer # New import for Nevergrad optimizer class
 from src.data_classes import GeneticOptimizationConfig, NevergradConfig, GeneticAlgorithmLookups # New import for data classes
+from src.utils import run_command
 
 # Global debug flag (will be set from args)
 DEBUG = False
@@ -231,16 +233,23 @@ def main():
         num_jobs = 1
 
     temp_repo_paths = []
-    print(f"\nPreparing {num_jobs} temporary copies of the repository for parallel processing...", file=sys.stderr)
+    print(f"\nPreparing {num_jobs} temporary clones of the repository for parallel processing (committed state of the checked-out branch)...", file=sys.stderr)
     try:
         for i in range(num_jobs):
             # Create a unique temporary directory
             # Add process_id to prefix for clarity in debug logs
             temp_dir = tempfile.mkdtemp(prefix=f'clang_opt_repo_{i}_')
-            print(f"  Copying '{repo_path_abs}' to '{temp_dir}'...", file=sys.stderr)
-            # Copy contents of the original repo to the temporary directory
-            # dirs_exist_ok=True is for Python 3.8+
-            shutil.copytree(repo_path_abs, temp_dir, dirs_exist_ok=True)
+            print(f"  Cloning '{repo_path_abs}' to '{temp_dir}'...", file=sys.stderr)
+            # Clone instead of copying the directory: each copy gets its own .git directory
+            # (a copied linked worktree would share one index with the other copies through its
+            # .git file) and only the committed files, without build trees and untracked files.
+            # A plain path clone hardlinks the objects and falls back to copying them across
+            # file systems, which an explicit --local does not do.
+            try:
+                run_command(["git", "clone", "--quiet", repo_path_abs, temp_dir], check=True, capture_output=True, text=True, debug=DEBUG)
+            except subprocess.CalledProcessError as e:
+                print(f"Error: Cannot clone '{repo_path_abs}': {e.stderr.strip()}", file=sys.stderr)
+                exit(1)
             temp_repo_paths.append(temp_dir)
         print("Temporary repositories prepared.", file=sys.stderr)
 
