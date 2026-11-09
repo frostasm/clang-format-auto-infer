@@ -136,7 +136,6 @@ python3 main.py /home/user/my_project \
     --jobs 4
 ```
 
-```
 ### Example Usage (Nevergrad)
 To optimize the `clang-format` configuration for a repository located at `/home/user/my_project` using the `Nevergrad` optimizer `CMA`, with a budget of 2000 evaluations, and 8 parallel jobs:
 
