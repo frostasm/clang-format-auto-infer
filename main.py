@@ -212,6 +212,14 @@ def main():
     # Load and flatten forced options
     forced_options_lookup = load_forced_options(args.forced_options_yaml_file)
 
+    # --dump-config writes a "Language: Cpp" section, which clang-format refuses for the
+    # Objective-C files (*.m, *.mm) that are formatted too ("Unsuitable"), so that every
+    # configuration would fail on a repository with such files. Without Language the section
+    # applies to every language. Keep the key only when the user forces it.
+    if 'Language' in options_info and 'Language' not in forced_options_lookup:
+        del options_info['Language']
+        print("\nRemoved 'Language' from the base configuration: the result applies to all languages. Force 'Language' to restrict it.", file=sys.stderr)
+
     # Create GeneticAlgorithmLookups object (used by both optimizers for option info)
     lookups = GeneticAlgorithmLookups(
         json_options_lookup=json_options_lookup,

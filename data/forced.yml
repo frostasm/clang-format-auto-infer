@@ -1,5 +1,4 @@
 DisableFormat: false
-Language: Cpp
 QualifierAlignment: Leave
 
 AccessModifierOffset: -2
