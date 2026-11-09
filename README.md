@@ -45,6 +45,12 @@ types, and possible enum values. This file is crucial for the optimizer to know 
 python3 get_option_values.py > data/clang-format-values.json
 ```
 
+Without arguments it reads the documentation of the development version of clang-format. To get the options and values of the clang-format you optimize for, pass its release (see `clang-format --version`) or major version. The documentation of the first release of that major version is used (e.g. 20.1.0 for 20.1.8): the patch releases do not change the options.
+
+```sh
+python3 get_option_values.py --llvm-version 20.1.8 > clang-format-20-values.json
+```
+
 ### Step 2: (Optional, Recommended) Define Forced Options 🔒
 If you have certain `clang-format` options that you always want to keep at a specific value (e.g., `ColumnLimit: 120`), you can define them in a YAML file.
 Example `data/forced.yml`:

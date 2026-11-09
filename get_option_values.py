@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup # pyright: ignore
+import argparse
 import requests
 import sys
 import re
@@ -207,9 +208,53 @@ def parse_options(html_content):
 
     return all_options_data
 
+LATEST_DOCS_URL = "https://clang.llvm.org/docs/ClangFormatStyleOptions.html"
+RELEASE_DOCS_URL = "https://releases.llvm.org/{version}/tools/clang/docs/ClangFormatStyleOptions.html"
+
+def fetch_release_docs(version):
+    """
+    Fetches the style options documentation of an LLVM release.
+
+    releases.llvm.org has the documentation of the first release of a major version only
+    (e.g. 20.1.0, 17.0.1, 16.0.0), not of the patch releases, which do not change the options.
+    So the exact version is tried first, then the first releases of its major version.
+
+    Returns:
+        tuple: (url, html) of the documentation found, or (None, None).
+    """
+    major = version.split('.')[0]
+    candidates = [version] + [v for v in (f"{major}.1.0", f"{major}.0.1", f"{major}.0.0") if v != version]
+    for candidate in candidates:
+        url = RELEASE_DOCS_URL.format(version=candidate)
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching URL {url}: {e}", file=sys.stderr)
+            return None, None
+        if response.status_code == 200:
+            return url, response.text
+        print(f"No documentation at {url} ({response.status_code})", file=sys.stderr)
+    return None, None
+
 if __name__ == '__main__':
-    url = "https://clang.llvm.org/docs/ClangFormatStyleOptions.html"
-    html_content = fetch_html_content(url)
+    arg_parser = argparse.ArgumentParser(
+        description="Print clang-format style options and their possible values as JSON, scraped from the clang-format documentation."
+    )
+    arg_parser.add_argument(
+        "--llvm-version",
+        metavar="X.Y.Z",
+        help="LLVM release whose documentation to read, e.g. 20.1.8 or 20 (see 'clang-format --version'). "
+             "Default: the documentation of the development version, which may list options "
+             "and values that a released clang-format rejects."
+    )
+    cli_args = arg_parser.parse_args()
+    if cli_args.llvm_version:
+        url, html_content = fetch_release_docs(cli_args.llvm_version)
+    else:
+        url = LATEST_DOCS_URL
+        html_content = fetch_html_content(url)
+    if url:
+        print(f"Read {url}", file=sys.stderr)
 
     if html_content:
         options_dict = parse_options(html_content)
