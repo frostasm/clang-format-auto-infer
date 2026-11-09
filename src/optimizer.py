@@ -17,7 +17,7 @@ try:
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
-    print("Warning: matplotlib not found. Fitness plotting will be disabled. Install with 'pip install matplotlib' to enable.", file=sys.stderr)
+    # Reported only when --plot-fitness asks for it: this module is imported by every worker
     MATPLOTLIB_AVAILABLE = False
 
 
@@ -96,7 +96,8 @@ def optimize_option_with_values(flat_options_info: Dict[str, Any], full_option_p
         # We now consider float('inf') as a valid (but high) result, not an error to skip
         if changes != -1: # Only skip if it's a git-related error (-1)
             # Treat float('inf') as a very high change count
-            print(f"Island {island_args.island_index} (Worker {worker_context.process_id}):   Testing '{full_option_path}'='{value_to_test}' -> Changes: {changes}", file=sys.stderr)
+            if island_args.formatter_settings.verbose:
+                print(f"Island {island_args.island_index} (Worker {worker_context.process_id}):   Testing '{full_option_path}'='{value_to_test}' -> Changes: {changes}", file=sys.stderr)
             if changes < min_changes:
                 min_changes = changes
                 best_values_candidates = [value_to_test] # New best found, reset list
@@ -113,14 +114,16 @@ def optimize_option_with_values(flat_options_info: Dict[str, Any], full_option_p
     if not best_values_candidates:
         # This happens if all tested values resulted in either a git error (-1) or an invalid clang-format config (float('inf')).
         # In this case, we keep the original value as we couldn't find a better valid one.
-        print(f"Island {island_args.island_index} (Worker {worker_context.process_id}): All tests failed or resulted in invalid configurations for '{full_option_path}'. Keeping original value: {original_value}", file=sys.stderr)
+        if island_args.formatter_settings.verbose:
+            print(f"Island {island_args.island_index} (Worker {worker_context.process_id}): All tests failed or resulted in invalid configurations for '{full_option_path}'. Keeping original value: {original_value}", file=sys.stderr)
         # Restore the original config state if no valid candidate was found
         flat_options_info.update(original_config_state)
         return float('inf') # Indicate that no valid fitness was found for this mutation
     else:
         # Randomly select one of the best values
         best_value = random.choice(best_values_candidates)
-        print(f"Island {island_args.island_index} (Worker {worker_context.process_id}): Best value for '{full_option_path}': {best_value} (changes: {min_changes})", file=sys.stderr)
+        if island_args.formatter_settings.verbose:
+            print(f"Island {island_args.island_index} (Worker {worker_context.process_id}): Best value for '{full_option_path}': {best_value} (changes: {min_changes})", file=sys.stderr)
         flat_options_info[full_option_path]['value'] = best_value
         return min_changes
 
@@ -514,8 +517,10 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
 
         try:
             # Evolution Loop
+            verbose = formatter_settings.verbose
             for iteration in range(num_iterations):
-                print(f"\n--- Iteration {iteration + 1}/{num_iterations} ---", file=sys.stderr)
+                if verbose:
+                    print(f"\n--- Iteration {iteration + 1}/{num_iterations} ---", file=sys.stderr)
 
                 # Prepare arguments for each island's evolution task
                 tasks_args = []
@@ -538,7 +543,8 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                 # Process results from parallel evolution
                 for i, (new_island_pop, best_in_island_for_this_gen) in enumerate(results):
                     populations[i] = new_island_pop # Update the island's population
-                    print(f"    Island {i + 1} best fitness: {best_in_island_for_this_gen['fitness']}", file=sys.stderr)
+                    if verbose:
+                        print(f"    Island {i + 1} best fitness: {best_in_island_for_this_gen['fitness']}", file=sys.stderr)
 
                     # Store fitness for plotting
                     fitness_history_per_island[i].append(best_in_island_for_this_gen['fitness'])
@@ -546,7 +552,7 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                     # Update overall best individual if this island found a better one
                     if best_in_island_for_this_gen['fitness'] < best_overall_individual['fitness']:
                         best_overall_individual = best_in_island_for_this_gen
-                        print(f"    New overall best fitness found: {best_overall_individual['fitness']}", file=sys.stderr)
+                        print(f"    Iteration {iteration + 1}/{num_iterations}, island {i + 1}: new overall best fitness: {best_overall_individual['fitness']}", file=sys.stderr)
 
                 # Update plot after all islands have evolved in this iteration
                 if plot_fitness and not interrupted: # Only update if not interrupted
@@ -563,7 +569,8 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
 
                 # Perform migration periodically if there's more than one island
                 if num_islands > 1 and (iteration + 1) % MIGRATION_INTERVAL == 0 and not interrupted:
-                    print(f"\n--- Performing migration at iteration {iteration + 1} ---", file=sys.stderr)
+                    if verbose:
+                        print(f"\n--- Performing migration at iteration {iteration + 1} ---", file=sys.stderr)
                     _perform_migration(populations, debug)
 
                     # After migration, re-find the overall best individual from the updated populations
@@ -572,8 +579,8 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                         current_overall_best_after_migration = min(all_individuals_after_migration, key=lambda x: x['fitness'])
                         if current_overall_best_after_migration['fitness'] < best_overall_individual['fitness']:
                             best_overall_individual = current_overall_best_after_migration
-                            print(f"  New overall best fitness found after migration: {current_overall_best_after_migration['fitness']}", file=sys.stderr)
-                        else:
+                            print(f"  Iteration {iteration + 1}/{num_iterations}: new overall best fitness after migration: {current_overall_best_after_migration['fitness']}", file=sys.stderr)
+                        elif verbose:
                             print(f"  Overall best fitness remains: {best_overall_individual['fitness']} after migration.", file=sys.stderr)
                     else:
                         print("Warning: All populations are empty after migration. This should not happen.", file=sys.stderr)

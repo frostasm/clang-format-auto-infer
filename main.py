@@ -85,7 +85,13 @@ def main():
     parser.add_argument(
         "-d", "--debug",
         action="store_true",
-        help="Enable debug output (print commands being executed)."
+        help="Enable debug output (print commands being executed). Implies --verbose."
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Print every evaluation, mutation and per-island result, and every configuration that clang-format rejects. "
+             "By default only the setup, new best results, errors and the summary are printed."
     )
     parser.add_argument(
         "--optimizer",
@@ -168,6 +174,7 @@ def main():
     # Set global debug flag
     global DEBUG
     DEBUG = args.debug
+    verbose = args.verbose or args.debug
 
     # Basic validation
     if not os.path.isdir(args.repo_path):
@@ -265,10 +272,11 @@ def main():
     find_options_without_json_values(options_info, lookups.json_options_lookup, lookups.forced_options_lookup, missing_options)
 
     if missing_options:
-        print("\nThe following options were found in the base config but were not present in the provided JSON file or had no possible values listed (and are not booleans or forced options):", file=sys.stderr)
-        for opt_path in missing_options: # opt_path now contains the full path
-            print(f"- {opt_path}", file=sys.stderr)
-        print("These options will retain their values from the base config unless specified in the forced options YAML file.", file=sys.stderr)
+        print(f"\n{len(missing_options)} options of the base config have no possible values in the JSON file (and are not booleans or forced options): "
+              "they keep their values from the base config." + ("" if verbose else " Use --verbose to list them."), file=sys.stderr)
+        if verbose:
+            for opt_path in missing_options: # opt_path now contains the full path
+                print(f"- {opt_path}", file=sys.stderr)
     elif args.option_values_json_file:
          print("\nAll non-boolean options found in the base config were present in the provided JSON file with possible values, or were explicitly forced.", file=sys.stderr)
     else:
@@ -287,7 +295,8 @@ def main():
             # Create a unique temporary directory
             # Add process_id to prefix for clarity in debug logs
             temp_dir = tempfile.mkdtemp(prefix=f'clang_opt_repo_{i}_')
-            print(f"  Cloning '{repo_path_abs}' to '{temp_dir}'...", file=sys.stderr)
+            if verbose:
+                print(f"  Cloning '{repo_path_abs}' to '{temp_dir}'...", file=sys.stderr)
             # Clone instead of copying the directory: each copy gets its own .git directory
             # (a copied linked worktree would share one index with the other copies through its
             # .git file) and only the committed files, without build trees and untracked files.
@@ -312,7 +321,8 @@ def main():
             file_sample_percentage=args.file_sample_percentage,
             random_seed=RANDOM_SEED, # The fixed random seed
             exclude_pathspecs=args.exclude_pathspecs,
-            clang_format=clang_format_path
+            clang_format=clang_format_path,
+            verbose=verbose
         )
 
         if args.optimizer == "genetic":
@@ -376,7 +386,8 @@ def main():
             try:
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
-                    print(f"  Removed '{temp_dir}'.", file=sys.stderr)
+                    if verbose:
+                        print(f"  Removed '{temp_dir}'.", file=sys.stderr)
             except OSError as e:
                 print(f"Error removing temporary directory '{temp_dir}': {e}", file=sys.stderr)
         print("Cleanup complete.", file=sys.stderr)

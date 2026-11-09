@@ -33,14 +33,16 @@ class NevergradConfig(BaseOptimizerConfig): # Inherit from BaseOptimizerConfig
 @dataclass
 class FormatterSettings:
     """
-    Settings of a fitness evaluation (running clang-format on a repository copy) that are the
-    same for every evaluation of a run. Passed as one object from main.py down to the workers.
+    Settings of a fitness evaluation (running clang-format on a repository copy) and of the
+    run's output that are the same for every evaluation of a run. Passed as one object from
+    main.py down to the workers.
     """
     file_sample_percentage: float # Percentage of files to sample for fitness calculation
     random_seed: int # Seed for random file sampling
     # Git pathspecs of files that are never formatted (e.g. "thirdparty", "*.pb.h")
     exclude_pathspecs: List[str] = field(default_factory=list)
     clang_format: str = "clang-format" # clang-format executable: a name in PATH or a path
+    verbose: bool = False # Print every evaluation and rejected configuration (--verbose)
 
 @dataclass
 class GeneticAlgorithmLookups:

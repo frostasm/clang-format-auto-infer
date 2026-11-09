@@ -19,7 +19,8 @@ try:
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
-    print("Warning: matplotlib not found. Fitness plotting will be disabled. Install with 'pip install matplotlib' to enable.", file=sys.stderr)
+    # Reported only when --plot-fitness asks for it: this module is imported by every worker
+    pass
 
 
 class NevergradOptimizer(BaseOptimizer):
@@ -143,6 +144,7 @@ class NevergradOptimizer(BaseOptimizer):
         # 1. Build Nevergrad Instrumentation
         # This defines the search space for Nevergrad
         instrumentation_params = {}
+        skipped_options = 0
         for full_option_path, option_info in base_options_info.items():
             if full_option_path in lookups.forced_options_lookup:
                 # Forced options are not part of the search space
@@ -167,7 +169,10 @@ class NevergradOptimizer(BaseOptimizer):
                 # For other types (lists, dicts) or strings without possible values,
                 # we fix them to their base value. They are not part of the search space.
                 # This means they are implicitly handled by `base_options_template` in the objective function.
-                print(f"Nevergrad: Skipping instrumentation for '{full_option_path}' (type: {option_info['type']}, no possible values or complex type). Will use its base value.", file=sys.stderr)
+                skipped_options += 1
+                if formatter_settings.verbose:
+                    print(f"Nevergrad: Skipping instrumentation for '{full_option_path}' (type: {option_info['type']}, no possible values or complex type). Will use its base value.", file=sys.stderr)
+        print(f"Nevergrad: {len(instrumentation_params)} options in the search space, {skipped_options} kept at their base value (no possible values or complex type).", file=sys.stderr)
 
         # Create the instrumentation object
         instrumentation = ng.p.Instrumentation(**instrumentation_params)

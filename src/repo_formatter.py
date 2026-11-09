@@ -109,7 +109,8 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
 
             if "cannot be used with" in error_output:
                 # This is a known invalid configuration error, treat as high cost
-                print(f"Worker {process_id}: Warning: clang-format reported an invalid configuration ('cannot be used with'). Treating as high cost.", file=sys.stderr)
+                if formatter_settings.verbose:
+                    print(f"Worker {process_id}: Warning: clang-format reported an invalid configuration ('cannot be used with'). Treating as high cost.", file=sys.stderr)
                 if debug:
                     print(f"Worker {process_id}: Command: {' '.join(e.cmd)}", file=sys.stderr)
                     print(f"Worker {process_id}: Exit code: {e.returncode}", file=sys.stderr)
@@ -133,7 +134,8 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
                 # exiting here would kill a pool worker and hang the optimization.
                 stderr_lines = (e.stderr or "").strip().splitlines()
                 reason = stderr_lines[-1] if stderr_lines else f"exit code {e.returncode}"
-                print(f"Worker {process_id}: Warning: clang-format rejected the configuration ({reason}). Treating as high cost.", file=sys.stderr)
+                if formatter_settings.verbose:
+                    print(f"Worker {process_id}: Warning: clang-format rejected the configuration ({reason}). Treating as high cost.", file=sys.stderr)
                 if debug:
                     print(f"Worker {process_id}: Command: {' '.join(e.cmd)}", file=sys.stderr)
                     print(f"Worker {process_id}: Exit code: {e.returncode}", file=sys.stderr)
