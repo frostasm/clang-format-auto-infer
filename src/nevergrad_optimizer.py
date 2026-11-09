@@ -7,7 +7,7 @@ import functools
 import concurrent.futures
 
 from .base_optimizer import BaseOptimizer
-from .data_classes import NevergradConfig, GeneticAlgorithmLookups, WorkerContext
+from .data_classes import NevergradConfig, GeneticAlgorithmLookups, WorkerContext, FormatterSettings
 from .clang_format_parser import generate_clang_format_config
 from .repo_formatter import run_clang_format_and_count_changes
 
@@ -36,8 +36,7 @@ class NevergradOptimizer(BaseOptimizer):
         base_options_template: Dict[str, Any],
         lookups: GeneticAlgorithmLookups,
         debug: bool,
-        file_sample_percentage: float,
-        random_seed: int,
+        formatter_settings: FormatterSettings,
         all_repo_paths: List[str],
         # Nevergrad passes parameters as keyword arguments based on instrumentation
         # These are the parameters from the search space (e.g., AlignAfterOpenBracket=value)
@@ -100,8 +99,7 @@ class NevergradOptimizer(BaseOptimizer):
             repo_path=worker_context.repo_path,
             process_id=worker_context.process_id,
             debug=debug,
-            file_sample_percentage=file_sample_percentage,
-            random_seed=random_seed
+            formatter_settings=formatter_settings
         )
 
         # Nevergrad minimizes, so higher changes mean worse fitness.
@@ -115,8 +113,7 @@ class NevergradOptimizer(BaseOptimizer):
                  base_options_info: Dict[str, Any],
                  repo_paths: List[str],
                  lookups: GeneticAlgorithmLookups,
-                 file_sample_percentage: float,
-                 random_seed: int,
+                 formatter_settings: FormatterSettings,
                  ) -> Dict[str, Any]:
         """
         Optimizes clang-format configuration using Nevergrad.
@@ -126,8 +123,8 @@ class NevergradOptimizer(BaseOptimizer):
             repo_paths (list): A list of paths to the temporary git repositories for parallel processing.
             lookups (GeneticAlgorithmLookups): A dataclass containing lookup dictionaries for
                                                option values and forced options.
-            file_sample_percentage (float): Percentage of files to sample for fitness calculation.
-            random_seed (int): Seed for random file sampling.
+            formatter_settings (FormatterSettings): Settings of each fitness evaluation
+                                                    (file sampling and its random seed).
 
         Returns:
             dict: The flat dictionary of the best clang-format configuration found.
@@ -225,8 +222,7 @@ class NevergradOptimizer(BaseOptimizer):
                 base_options_template=base_options_info,
                 lookups=lookups,
                 debug=debug,
-                file_sample_percentage=file_sample_percentage,
-                random_seed=random_seed, # random_seed is still passed here for file sampling
+                formatter_settings=formatter_settings,
                 all_repo_paths=repo_paths,
             )
 

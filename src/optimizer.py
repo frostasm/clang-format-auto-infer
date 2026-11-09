@@ -7,7 +7,7 @@ from typing import List, Tuple, Dict, Any
 # Import formatter and config generator
 from .repo_formatter import run_clang_format_and_count_changes
 from .clang_format_parser import generate_clang_format_config
-from .data_classes import GeneticOptimizationConfig, GeneticAlgorithmLookups, IslandEvolutionArgs, WorkerContext
+from .data_classes import GeneticOptimizationConfig, GeneticAlgorithmLookups, IslandEvolutionArgs, WorkerContext, FormatterSettings
 from .base_optimizer import BaseOptimizer # New import
 
 # Initialize plt to None to prevent UnboundLocalError warnings from static analyzers
@@ -89,8 +89,7 @@ def optimize_option_with_values(flat_options_info: Dict[str, Any], full_option_p
             repo_path=worker_context.repo_path,
             process_id=worker_context.process_id,
             debug=island_args.debug,
-            file_sample_percentage=island_args.file_sample_percentage,
-            random_seed=island_args.random_seed
+            formatter_settings=island_args.formatter_settings
         )
 
         # We now consider float('inf') as a valid (but high) result, not an error to skip
@@ -274,13 +273,13 @@ def _evolve_island_generation_task(island_args: IslandEvolutionArgs, worker_cont
 
     return new_population, best_in_generation
 
-def _island_evolution_task_wrapper(args_tuple: Tuple[IslandEvolutionArgs, List[str], GeneticAlgorithmLookups, bool, float, int]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+def _island_evolution_task_wrapper(args_tuple: Tuple[IslandEvolutionArgs, List[str], GeneticAlgorithmLookups, bool, FormatterSettings]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Wrapper function for multiprocessing.Pool.map.
     It unpacks arguments, determines the worker's specific repo_path and process_id,
     creates a WorkerContext, and then calls the actual island evolution logic.
     """
-    island_args_for_this_island, all_repo_paths, lookups, debug, file_sample_percentage, random_seed = args_tuple
+    island_args_for_this_island, all_repo_paths, lookups, debug, formatter_settings = args_tuple
 
     # Get the unique process ID for this worker
     # _identity[0] gives a unique integer for each worker process (starts from 1)
@@ -293,15 +292,14 @@ def _island_evolution_task_wrapper(args_tuple: Tuple[IslandEvolutionArgs, List[s
     # Create a WorkerContext for this specific worker process
     worker_context = WorkerContext(repo_path=repo_path_for_worker, process_id=process_id)
 
-    # Update the island_args with the lookups, debug, sampling, and random_seed
+    # Update the island_args with the lookups, debug and formatter settings
     # These were passed separately to the wrapper because they are constant across all islands
     # but need to be part of IslandEvolutionArgs for the inner functions.
     # This is a bit of a hack to avoid modifying IslandEvolutionArgs in place in the main process,
     # but it works for passing context down.
     island_args_for_this_island.lookups = lookups
     island_args_for_this_island.debug = debug
-    island_args_for_this_island.file_sample_percentage = file_sample_percentage
-    island_args_for_this_island.random_seed = random_seed
+    island_args_for_this_island.formatter_settings = formatter_settings
 
     # Now call the actual island evolution function
     return _evolve_island_generation_task(island_args_for_this_island, worker_context)
@@ -381,8 +379,7 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                  base_options_info: Dict[str, Any],
                  repo_paths: List[str],
                  lookups: GeneticAlgorithmLookups,
-                 file_sample_percentage: float,
-                 random_seed: int) -> Dict[str, Any]:
+                 formatter_settings: FormatterSettings) -> Dict[str, Any]:
         """
         Optimizes clang-format configuration using a genetic algorithm with an island model.
 
@@ -391,8 +388,8 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
             repo_paths (list): A list of paths to the temporary git repositories for parallel processing.
             lookups (GeneticAlgorithmLookups): A dataclass containing lookup dictionaries for
                                                option values and forced options.
-            file_sample_percentage (float): Percentage of files to sample for fitness calculation.
-            random_seed (int): Seed for random file sampling.
+            formatter_settings (FormatterSettings): Settings of each fitness evaluation
+                                                    (file sampling and its random seed).
 
         Returns:
             dict: The flat dictionary of the best clang-format configuration found.
@@ -450,8 +447,7 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
             repo_path=initial_worker_context.repo_path,
             process_id=initial_worker_context.process_id,
             debug=debug,
-            file_sample_percentage=file_sample_percentage,
-            random_seed=random_seed
+            formatter_settings=formatter_settings
         )
         print(f"Initial base configuration fitness: {base_fitness}", file=sys.stderr)
 
@@ -527,11 +523,10 @@ class GeneticAlgorithmOptimizer(BaseOptimizer):
                         island_index=i, # Pass the logical island index
                         lookups=lookups, # These will be passed to the wrapper and then assigned
                         debug=debug,     # to the IslandEvolutionArgs object inside the worker
-                        file_sample_percentage=file_sample_percentage,
-                        random_seed=random_seed
+                        formatter_settings=formatter_settings
                     )
                     # The wrapper will handle assigning the correct repo_path and process_id
-                    tasks_args.append((island_args_for_this_island, repo_paths, lookups, debug, file_sample_percentage, random_seed))
+                    tasks_args.append((island_args_for_this_island, repo_paths, lookups, debug, formatter_settings))
 
                 # Run island evolutions in parallel
                 results = pool.map(_island_evolution_task_wrapper, tasks_args)

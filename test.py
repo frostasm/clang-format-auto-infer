@@ -11,7 +11,7 @@ from src.config_loader import load_json_option_values, load_forced_options
 from src.clang_format_parser import get_clang_format_options, parse_clang_format_options, generate_clang_format_config
 from src.repo_formatter import run_clang_format_and_count_changes
 from src.optimizer import optimize_option_with_values # Import the specific function
-from src.data_classes import IslandEvolutionArgs, GeneticAlgorithmLookups, WorkerContext # New imports for data classes
+from src.data_classes import IslandEvolutionArgs, GeneticAlgorithmLookups, WorkerContext, FormatterSettings # New imports for data classes
 
 # Fixed random seed for reproducibility of file sampling in tests
 RANDOM_SEED = 42
@@ -109,8 +109,10 @@ def main():
             island_index=0, # Assign island index 0 for test
             lookups=dummy_lookups,
             debug=True, # Use True for debug as per original call
-            file_sample_percentage=100.0, # Default for test
-            random_seed=RANDOM_SEED # Use the defined random seed
+            formatter_settings=FormatterSettings(
+                file_sample_percentage=100.0, # Default for test
+                random_seed=RANDOM_SEED # Use the defined random seed
+            )
         )
 
         # Create a WorkerContext for the test (representing the main process as worker 1)
@@ -167,8 +169,7 @@ def main():
                     repo_path=test_worker_context.repo_path,
                     process_id=test_worker_context.process_id,
                     debug=test_island_args.debug,
-                    file_sample_percentage=test_island_args.file_sample_percentage,
-                    random_seed=test_island_args.random_seed
+                    formatter_settings=test_island_args.formatter_settings
                 )
 
                 print(f"  Summary for '{option_name}':", file=sys.stderr)

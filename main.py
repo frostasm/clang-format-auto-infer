@@ -12,7 +12,7 @@ from src.clang_format_parser import get_clang_format_options, parse_clang_format
 from src.config_loader import load_json_option_values, load_forced_options
 from src.optimizer import GeneticAlgorithmOptimizer # Import the GA optimizer class
 from src.nevergrad_optimizer import NevergradOptimizer # New import for Nevergrad optimizer class
-from src.data_classes import GeneticOptimizationConfig, NevergradConfig, GeneticAlgorithmLookups # New import for data classes
+from src.data_classes import GeneticOptimizationConfig, NevergradConfig, GeneticAlgorithmLookups, FormatterSettings # New import for data classes
 from src.utils import run_command
 
 # Global debug flag (will be set from args)
@@ -260,6 +260,10 @@ def main():
         print("\nStarting optimization...", file=sys.stderr)
 
         optimized_options_info = None
+        formatter_settings = FormatterSettings(
+            file_sample_percentage=args.file_sample_percentage,
+            random_seed=RANDOM_SEED # The fixed random seed
+        )
 
         if args.optimizer == "genetic":
             # Create OptimizationConfig object for Genetic Algorithm
@@ -275,8 +279,7 @@ def main():
                 options_info, # Base configuration for population initialization
                 temp_repo_paths, # Pass the list of temporary repo paths
                 lookups, # Pass the lookups object
-                args.file_sample_percentage, # Pass file sampling percentage
-                RANDOM_SEED # Pass the fixed random seed
+                formatter_settings # Pass file sampling settings
             )
         elif args.optimizer == "nevergrad":
             # Create NevergradConfig object
@@ -292,8 +295,7 @@ def main():
                 options_info, # Base configuration for Nevergrad instrumentation
                 temp_repo_paths, # Pass the list of temporary repo paths
                 lookups, # Pass the lookups object
-                args.file_sample_percentage, # Pass file sampling percentage
-                RANDOM_SEED # Pass the fixed random seed
+                formatter_settings # Pass file sampling settings
             )
         else:
             print(f"Error: Unknown optimizer '{args.optimizer}'.", file=sys.stderr)

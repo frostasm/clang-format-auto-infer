@@ -31,6 +31,15 @@ class NevergradConfig(BaseOptimizerConfig): # Inherit from BaseOptimizerConfig
     plot_fitness: bool # New: Add plot_fitness to NevergradConfig
 
 @dataclass
+class FormatterSettings:
+    """
+    Settings of a fitness evaluation (running clang-format on a repository copy) that are the
+    same for every evaluation of a run. Passed as one object from main.py down to the workers.
+    """
+    file_sample_percentage: float # Percentage of files to sample for fitness calculation
+    random_seed: int # Seed for random file sampling
+
+@dataclass
 class GeneticAlgorithmLookups:
     """
     Lookup data (JSON option values, forced options) needed by the genetic algorithm.
@@ -49,8 +58,7 @@ class IslandEvolutionArgs:
     island_index: int # The logical index of this island (0 to num_islands-1)
     lookups: GeneticAlgorithmLookups # Pass the lookups here
     debug: bool # Pass debug flag here
-    file_sample_percentage: float # Percentage of files to sample for fitness calculation
-    random_seed: int # Seed for random file sampling
+    formatter_settings: FormatterSettings # Settings of each fitness evaluation
 
 @dataclass
 class WorkerContext:

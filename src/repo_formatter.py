@@ -4,6 +4,7 @@ import sys
 import re
 import random # New import for file sampling
 from .utils import run_command # Import run_command from utils
+from .data_classes import FormatterSettings
 # Removed IslandEvolutionArgs import as it's no longer directly used here
 # from .data_classes import IslandEvolutionArgs # Old import
 
@@ -11,7 +12,7 @@ from .utils import run_command # Import run_command from utils
 CLANG_FORMAT_TIMEOUT = 120 # seconds
 GIT_COMMAND_TIMEOUT = 60 # seconds
 
-def run_clang_format_and_count_changes(config_string: str, repo_path: str, process_id: int, debug: bool, file_sample_percentage: float, random_seed: int) -> float:
+def run_clang_format_and_count_changes(config_string: str, repo_path: str, process_id: int, debug: bool, formatter_settings: FormatterSettings) -> float:
     """
     Runs a clang-format configuration on a repository, counts changes, and resets.
 
@@ -20,8 +21,8 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
         repo_path (str): The path to the specific temporary git repository for this worker.
         process_id (int): The unique identifier for the worker process.
         debug (bool): Enable debug output.
-        file_sample_percentage (float): Percentage of files to randomly sample for fitness calculation.
-        random_seed (int): Seed for random file sampling.
+        formatter_settings (FormatterSettings): Settings of the evaluation: the percentage of files
+                                                to randomly sample and the seed for the sampling.
 
     Returns:
         int or float('inf'): The total number of lines added or deleted by clang-format (>= 0).
@@ -35,6 +36,8 @@ def run_clang_format_and_count_changes(config_string: str, repo_path: str, proce
                       worker processes, so it never calls sys.exit(): a SystemExit in a
                       multiprocessing.Pool worker leaves the pool waiting forever.
     """
+    file_sample_percentage = formatter_settings.file_sample_percentage
+    random_seed = formatter_settings.random_seed
     original_cwd = os.getcwd()
     # Ensure we are in the repo directory for git commands
     # os.chdir(repo_path) # Moved chdir into the try block for better cleanup
