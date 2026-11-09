@@ -13,6 +13,8 @@ import sys
 import tempfile # New import for temporary directories
 import shutil # New import for copying/removing directories
 import subprocess
+import copy
+import difflib
 import multiprocessing # New import for multiprocessing Manager and Value
 
 # Import functions from the new modules (relative imports within the src package)
@@ -22,6 +24,7 @@ from src.optimizer import GeneticAlgorithmOptimizer # Import the GA optimizer cl
 from src.nevergrad_optimizer import NevergradOptimizer # New import for Nevergrad optimizer class
 from src.data_classes import GeneticOptimizationConfig, NevergradConfig, GeneticAlgorithmLookups, FormatterSettings # New import for data classes
 from src.utils import run_command
+from src.config_updater import changed_options, update_config_text, dump_config
 
 # Global debug flag (will be set from args)
 DEBUG = False
@@ -55,6 +58,45 @@ def find_options_without_json_values(flat_options_info, json_options_lookup, for
                 missing_list.append(full_option_path)
             # If it *is* a boolean and not in JSON/no values, it will be auto-tested, so don't add to missing list
 
+
+def build_updated_start_config(start_config_file, start_options_info, optimized_options_info, optimized_config, clang_format):
+    """
+    Returns the start config file updated with the options that the optimization changed,
+    keeping the rest of the file. Falls back to the full optimized config, with a warning,
+    when the update cannot be written or clang-format does not read it like the full config.
+    """
+    with open(start_config_file, 'r') as f:
+        start_text = f.read()
+    changes = changed_options(start_options_info, optimized_options_info)
+    if not changes:
+        print("\nNo option changed: the start config is written unchanged.", file=sys.stderr)
+        return start_text
+    print(f"\n{len(changes)} options changed:", file=sys.stderr)
+    for path, (old_value, new_value) in changes.items():
+        print(f"  {path}: {old_value} -> {new_value}", file=sys.stderr)
+
+    updated_text, problems = update_config_text(start_text, changes, optimized_options_info)
+    if problems:
+        print("Warning: cannot update the start config, writing the full configuration instead:", file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        return optimized_config
+    try:
+        updated_dump = dump_config(clang_format, updated_text)
+        full_dump = dump_config(clang_format, optimized_config)
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: clang-format rejects the updated start config ({e.stderr.strip()}), writing the full configuration instead.", file=sys.stderr)
+        return optimized_config
+    if updated_dump != full_dump:
+        # Usually a deprecated key of the start file that overrides its new name, e.g.
+        # AlwaysBreakTemplateDeclarations over BreakTemplateDeclarations
+        print("Warning: clang-format reads the updated start config differently from the result, writing the full configuration instead. "
+              "Differences (- updated start config, + result):", file=sys.stderr)
+        for line in difflib.unified_diff(updated_dump.splitlines(), full_dump.splitlines(), lineterm='', n=0):
+            if line.startswith(('-', '+')) and not line.startswith(('---', '+++')):
+                print(f"  {line}", file=sys.stderr)
+        return optimized_config
+    return updated_text
 
 def main():
     """
@@ -168,8 +210,17 @@ def main():
         metavar="EXECUTABLE",
         help="clang-format executable to optimize the configuration for: a name in PATH or a path, e.g. clang-format-20. Default: clang-format."
     )
+    parser.add_argument(
+        "--update-start-config",
+        action="store_true",
+        help="Write the result as the --start-config-file with only the changed options edited or added, keeping its comments, "
+             "key order and formatting, instead of every option of --dump-config. The result is checked with clang-format; "
+             "when it is not equivalent, the full configuration is written with a warning."
+    )
 
     args = parser.parse_args()
+    if args.update_start_config and not args.start_config_file:
+        parser.error("--update-start-config needs --start-config-file")
 
     # Set global debug flag
     global DEBUG
@@ -258,6 +309,9 @@ def main():
     if 'Language' in options_info and 'Language' not in forced_options_lookup:
         del options_info['Language']
         print("\nRemoved 'Language' from the base configuration: the result applies to all languages. Force 'Language' to restrict it.", file=sys.stderr)
+
+    # The start values, to find the options that the optimization changed (--update-start-config)
+    start_options_info = copy.deepcopy(options_info)
 
     # Create GeneticAlgorithmLookups object (used by both optimizers for option info)
     lookups = GeneticAlgorithmLookups(
@@ -365,6 +419,9 @@ def main():
 
         # Generate the final optimized configuration from the modified flat structure
         optimized_config = generate_clang_format_config(optimized_options_info)
+        if args.update_start_config:
+            optimized_config = build_updated_start_config(
+                args.start_config_file, start_options_info, optimized_options_info, optimized_config, clang_format_path)
 
         # Output the final configuration
         if args.output_file:
