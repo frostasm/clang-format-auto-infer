@@ -1,8 +1,7 @@
 import json
-import yaml
 import os
 import sys
-from .clang_format_parser import ClangFormatYamlLoader
+from .clang_format_parser import load_yaml, YAMLError
 
 def with_current_value(possible_values, current_value):
     """
@@ -84,7 +83,7 @@ def load_forced_options(file_path):
 
     try:
         with open(file_path, 'r') as f:
-            raw_forced_options = yaml.load(f, Loader=ClangFormatYamlLoader) # Yes/No stay strings
+            raw_forced_options = load_yaml(f) # YAML 1.2: Yes/No stay strings
             if not isinstance(raw_forced_options, dict):
                  print(f"Error: YAML file '{file_path}' does not contain a dictionary.", file=sys.stderr)
                  sys.exit(1)
@@ -108,7 +107,7 @@ def load_forced_options(file_path):
 
         print(f"Successfully loaded and flattened forced options from '{file_path}'.", file=sys.stderr)
         return flat_forced_options
-    except yaml.YAMLError as e:
+    except YAMLError as e:
         print(f"Error parsing YAML from '{file_path}': {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:

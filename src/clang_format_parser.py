@@ -1,26 +1,26 @@
-import yaml
-import re
+import io
 import sys
 import subprocess
 import copy
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from .utils import run_command # Import run_command from utils
 
-class ClangFormatYamlLoader(yaml.SafeLoader):
-    """
-    A SafeLoader that reads only true/false as booleans, like clang-format.
+# ruamel.yaml follows YAML 1.2, like clang-format: only true/false are booleans, so the enum
+# values Yes and No (BreakTemplateDeclarations) stay strings. With YAML 1.1 (PyYAML) they became
+# True/False, written back as true/false, and clang-format reads false as MultiLine.
 
-    PyYAML follows YAML 1.1, where yes/no/on/off are booleans too. The enum values Yes and No
-    of BreakTemplateDeclarations then became True/False, were written back as true/false, and
-    clang-format reads false as MultiLine, so "No" changed the style; the option was also
-    optimized as a boolean, without its other values.
-    """
+def load_yaml(source):
+    """Loads one YAML document (a string or a stream) into plain dicts, lists and scalars."""
+    return YAML(typ='safe').load(source)
 
-ClangFormatYamlLoader.yaml_implicit_resolvers = {
-    first_char: [resolver for resolver in resolvers if resolver[0] != 'tag:yaml.org,2002:bool']
-    for first_char, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
-}
-ClangFormatYamlLoader.add_implicit_resolver(
-    'tag:yaml.org,2002:bool', re.compile(r'^(?:true|True|TRUE|false|False|FALSE)$'), list('tTfF'))
+def dump_yaml(data):
+    """Dumps plain dicts, lists and scalars as a block-style YAML string, keeping the key order."""
+    yaml = YAML(typ='safe')
+    yaml.default_flow_style = False
+    stream = io.StringIO()
+    yaml.dump(data, stream)
+    return stream.getvalue()
 
 def get_clang_format_options(debug=False, clang_format="clang-format"):
     """
@@ -67,7 +67,7 @@ def parse_clang_format_options(yaml_string):
               Returns None if parsing fails.
     """
     try:
-        config = yaml.load(yaml_string, Loader=ClangFormatYamlLoader)
+        config = load_yaml(yaml_string)
         if not isinstance(config, dict):
             print("Error: Parsed clang-format config is not a dictionary.", file=sys.stderr)
             return None
@@ -92,7 +92,7 @@ def parse_clang_format_options(yaml_string):
         flatten_dict(config)
         return flat_options
 
-    except yaml.YAMLError as e:
+    except YAMLError as e:
         print(f"Error parsing YAML output from clang-format: {e}", file=sys.stderr)
         return None
 
@@ -126,5 +126,5 @@ def generate_clang_format_config(flat_options_info):
                     current_level[part] = {}
                 current_level = current_level[part]
             
-    return yaml.dump(nested_config, default_flow_style=False, sort_keys=False)
+    return dump_yaml(nested_config)
 

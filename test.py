@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.9"
 # dependencies = [
-#     "PyYAML",
+#     "ruamel.yaml",
 #     "nevergrad",
 #     "matplotlib",
 #     "rich",

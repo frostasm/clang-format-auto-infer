@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.9"
 # dependencies = [
-#     "PyYAML",
+#     "ruamel.yaml",
 #     "nevergrad",
 #     "matplotlib",
 #     "rich",
@@ -13,11 +13,10 @@ import sys
 import tempfile # New import for temporary directories
 import shutil # New import for copying/removing directories
 import subprocess
-import yaml # New import for loading YAML config files
 import multiprocessing # New import for multiprocessing Manager and Value
 
 # Import functions from the new modules (relative imports within the src package)
-from src.clang_format_parser import get_clang_format_options, parse_clang_format_options, generate_clang_format_config
+from src.clang_format_parser import get_clang_format_options, parse_clang_format_options, generate_clang_format_config, YAMLError
 from src.config_loader import load_json_option_values, load_forced_options
 from src.optimizer import GeneticAlgorithmOptimizer # Import the GA optimizer class
 from src.nevergrad_optimizer import NevergradOptimizer # New import for Nevergrad optimizer class
@@ -225,7 +224,7 @@ def main():
                 print(f"Error: Failed to parse YAML from '{args.start_config_file}'. Please ensure it's a valid .clang-format file.", file=sys.stderr)
                 exit(1)
             print(f"Successfully loaded and parsed initial configuration from '{args.start_config_file}' ({len(options_info)} options after --dump-config).", file=sys.stderr)
-        except yaml.YAMLError as e:
+        except YAMLError as e:
             print(f"Error parsing YAML from '{args.start_config_file}': {e}", file=sys.stderr)
             exit(1)
     else:

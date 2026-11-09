@@ -40,9 +40,9 @@ It's recommended to use a virtual environment.
     ```
 2.  **Install the required Python packages:**
     ```bash
-    pip install PyYAML requests beautifulsoup4 lxml matplotlib nevergrad rich
+    pip install ruamel.yaml requests beautifulsoup4 lxml matplotlib nevergrad rich
     ```
-    *   `PyYAML`: For parsing and generating YAML configurations.
+    *   `ruamel.yaml`: For parsing and generating YAML configurations. It follows YAML 1.2, like `clang-format`, so values such as `Yes` and `No` stay strings.
     *   `requests`, `beautifulsoup4`, `lxml`: For scraping `clang-format` documentation to get option values.
     *   `matplotlib`: (Optional) For plotting the fitness history during optimization. If not installed, plotting will be disabled.
     *   `nevergrad`: For black-box optimization algorithms.
