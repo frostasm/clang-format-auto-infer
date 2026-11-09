@@ -2,6 +2,7 @@ import json
 import yaml
 import os
 import sys
+from .clang_format_parser import ClangFormatYamlLoader
 
 def with_current_value(possible_values, current_value):
     """
@@ -83,7 +84,7 @@ def load_forced_options(file_path):
 
     try:
         with open(file_path, 'r') as f:
-            raw_forced_options = yaml.safe_load(f)
+            raw_forced_options = yaml.load(f, Loader=ClangFormatYamlLoader) # Yes/No stay strings
             if not isinstance(raw_forced_options, dict):
                  print(f"Error: YAML file '{file_path}' does not contain a dictionary.", file=sys.stderr)
                  sys.exit(1)

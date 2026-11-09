@@ -1,8 +1,26 @@
 import yaml
+import re
 import sys
 import subprocess
 import copy
 from .utils import run_command # Import run_command from utils
+
+class ClangFormatYamlLoader(yaml.SafeLoader):
+    """
+    A SafeLoader that reads only true/false as booleans, like clang-format.
+
+    PyYAML follows YAML 1.1, where yes/no/on/off are booleans too. The enum values Yes and No
+    of BreakTemplateDeclarations then became True/False, were written back as true/false, and
+    clang-format reads false as MultiLine, so "No" changed the style; the option was also
+    optimized as a boolean, without its other values.
+    """
+
+ClangFormatYamlLoader.yaml_implicit_resolvers = {
+    first_char: [resolver for resolver in resolvers if resolver[0] != 'tag:yaml.org,2002:bool']
+    for first_char, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+ClangFormatYamlLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:bool', re.compile(r'^(?:true|True|TRUE|false|False|FALSE)$'), list('tTfF'))
 
 def get_clang_format_options(debug=False, clang_format="clang-format"):
     """
@@ -49,7 +67,7 @@ def parse_clang_format_options(yaml_string):
               Returns None if parsing fails.
     """
     try:
-        config = yaml.safe_load(yaml_string)
+        config = yaml.load(yaml_string, Loader=ClangFormatYamlLoader)
         if not isinstance(config, dict):
             print("Error: Parsed clang-format config is not a dictionary.", file=sys.stderr)
             return None
